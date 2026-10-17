@@ -17,24 +17,24 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class ChatRoomControllerTest {
 
-    private MockMvc mockMvc;
-    private ChatRoomService chatRoomService;
+	private MockMvc mockMvc;
+	private ChatRoomService chatRoomService;
 
-    @BeforeEach
-    void setUp() {
-        chatRoomService = mock(ChatRoomService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new ChatRoomController(chatRoomService)).build();
-    }
+	@BeforeEach
+	void setUp() {
+		chatRoomService = mock(ChatRoomService.class);
+		mockMvc = MockMvcBuilders.standaloneSetup(new ChatRoomController(chatRoomService)).build();
+	}
 
-    @Test
-    void returnsOnlyRoomIdWhenCreatingRoom() throws Exception {
-        UUID roomId = UUID.fromString("450e8400-e29b-41d4-a716-446655440000");
-        when(chatRoomService.createRoom()).thenReturn(roomId);
+	@Test
+	void returnsOnlyRoomIdWhenCreatingRoom() throws Exception {
+		UUID roomId = UUID.fromString("450e8400-e29b-41d4-a716-446655440000");
+		when(chatRoomService.createRoom()).thenReturn(roomId);
 
-        mockMvc.perform(post("/api/v1/chat-rooms"))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith("application/json"))
-                .andExpect(jsonPath("$.id", equalTo(roomId.toString())))
-                .andExpect(jsonPath("$.created_at").doesNotExist());
-    }
+		mockMvc.perform(post("/api/v1/chat-rooms"))
+			.andExpect(status().isOk())
+			.andExpect(content().contentTypeCompatibleWith("application/json"))
+			.andExpect(jsonPath("$.id", equalTo(roomId.toString())))
+			.andExpect(jsonPath("$.created_at").doesNotExist());
+	}
 }

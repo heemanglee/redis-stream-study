@@ -19,53 +19,53 @@ import org.springframework.web.client.RestClient;
 
 class RestClientOpenAiClientTest {
 
-    private MockRestServiceServer server;
-    private RestClientOpenAiClient client;
+	private MockRestServiceServer server;
+	private RestClientOpenAiClient client;
 
-    @BeforeEach
-    void setUp() {
-        RestClient.Builder builder = RestClient.builder();
-        server = MockRestServiceServer.bindTo(builder).build();
-        client = new RestClientOpenAiClient(
-                builder,
-                new OpenAiProperties("test-key", "https://api.openai.test", "gpt-5.6-luna", "low"));
-    }
+	@BeforeEach
+	void setUp() {
+		RestClient.Builder builder = RestClient.builder();
+		server = MockRestServiceServer.bindTo(builder).build();
+		client = new RestClientOpenAiClient(
+			builder,
+			new OpenAiProperties("test-key", "https://api.openai.test", "gpt-5.6-luna", "low"));
+	}
 
-    @Test
-    void sendsConfiguredModelAndExtractsOutputText() {
-        server.expect(requestTo("https://api.openai.test/v1/responses"))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(header(AUTHORIZATION, "Bearer test-key"))
-                .andExpect(content().json("""
-                        {
-                          "model": "gpt-5.6-luna",
-                          "reasoning": {"effort": "low"},
-                          "input": "What is Redis Stream?"
-                        }
-                        """))
-                .andRespond(withSuccess("""
-                        {"output":[{"content":[{"type":"output_text","text":"It is an append-only log."}]}]}
-                        """, APPLICATION_JSON));
+	@Test
+	void sendsConfiguredModelAndExtractsOutputText() {
+		server.expect(requestTo("https://api.openai.test/v1/responses"))
+			.andExpect(method(HttpMethod.POST))
+			.andExpect(header(AUTHORIZATION, "Bearer test-key"))
+			.andExpect(content().json("""
+				{
+				  "model": "gpt-5.6-luna",
+				  "reasoning": {"effort": "low"},
+				  "input": "What is Redis Stream?"
+				}
+				"""))
+			.andRespond(withSuccess("""
+				{"output":[{"content":[{"type":"output_text","text":"It is an append-only log."}]}]}
+				""", APPLICATION_JSON));
 
-        assertThat(client.generate("What is Redis Stream?")).isEqualTo("It is an append-only log.");
-        server.verify();
-    }
+		assertThat(client.generate("What is Redis Stream?")).isEqualTo("It is an append-only log.");
+		server.verify();
+	}
 
-    @Test
-    void raisesTypedExceptionForServerError() {
-        server.expect(requestTo("https://api.openai.test/v1/responses"))
-                .andRespond(withServerError());
+	@Test
+	void raisesTypedExceptionForServerError() {
+		server.expect(requestTo("https://api.openai.test/v1/responses"))
+			.andRespond(withServerError());
 
-        assertThatThrownBy(() -> client.generate("question"))
-                .isInstanceOf(OpenAiClientException.class);
-    }
+		assertThatThrownBy(() -> client.generate("question"))
+			.isInstanceOf(OpenAiClientException.class);
+	}
 
-    @Test
-    void raisesTypedExceptionForMalformedResponse() {
-        server.expect(requestTo("https://api.openai.test/v1/responses"))
-                .andRespond(withSuccess("{\"output\":[]}", APPLICATION_JSON));
+	@Test
+	void raisesTypedExceptionForMalformedResponse() {
+		server.expect(requestTo("https://api.openai.test/v1/responses"))
+			.andRespond(withSuccess("{\"output\":[]}", APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.generate("question"))
-                .isInstanceOf(OpenAiClientException.class);
-    }
+		assertThatThrownBy(() -> client.generate("question"))
+			.isInstanceOf(OpenAiClientException.class);
+	}
 }

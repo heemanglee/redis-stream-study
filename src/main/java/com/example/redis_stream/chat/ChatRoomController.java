@@ -11,10 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class ChatRoomController {
 
-    private final ChatRoomService chatRoomService;
+	private final ChatRoomService chatRoomService;
 
-    @PostMapping
-    public ResponseEntity<ChatRoomResponse> createRoom() {
-        return ResponseEntity.ok(new ChatRoomResponse(chatRoomService.createRoom()));
-    }
+	@PostMapping
+	public ResponseEntity<ChatRoomResponse> createRoom() {
+		return ResponseEntity.ok(new ChatRoomResponse(chatRoomService.createRoom()));
+	}
 }

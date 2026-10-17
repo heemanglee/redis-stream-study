@@ -123,6 +123,28 @@ MESSAGE_PROCESSING_FAILED
 
 Each Redis log includes the command name, key, `room_id`, `message_id`, and when applicable `stream_message_id`, consumer group, and consumer name. Full question and answer content is not logged.
 
+## Java formatting
+
+Java sources use the NAVER Java formatter (tabs displayed at width 4 and a
+120-character line width), managed by Spotless 8.10.4 and Eclipse JDT 4.41.
+The official formatter profile is stored in
+`config/formatter/naver-eclipse-formatter.xml` from
+[naver/hackday-conventions-java](https://github.com/naver/hackday-conventions-java/blob/e12658edad4017e2c00ef560704129901770cc2b/rule-config/naver-eclipse-formatter.xml).
+
+Apply formatting:
+
+```bash
+./gradlew spotlessApply
+```
+
+Check formatting:
+
+```bash
+./gradlew spotlessCheck
+```
+
+`./gradlew check` also checks formatting alongside the tests.
+
 ## Tests
 
 Run unit and integration tests:

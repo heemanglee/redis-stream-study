@@ -19,85 +19,84 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class QuestionEventProcessor {
 
-    private static final Logger log = LoggerFactory.getLogger(QuestionEventProcessor.class);
+	private static final Logger log = LoggerFactory.getLogger(QuestionEventProcessor.class);
 
-    private final StringRedisTemplate redisTemplate;
-    private final RedisKeyFactory keyFactory;
-    private final OpenAiClient openAiClient;
-    private final ObjectMapper objectMapper;
-    private final Clock clock;
-    private final WorkerProperties workerProperties;
+	private final StringRedisTemplate redisTemplate;
+	private final RedisKeyFactory keyFactory;
+	private final OpenAiClient openAiClient;
+	private final ObjectMapper objectMapper;
+	private final Clock clock;
+	private final WorkerProperties workerProperties;
 
-    public QuestionEventProcessor(
-            StringRedisTemplate redisTemplate,
-            RedisKeyFactory keyFactory,
-            OpenAiClient openAiClient,
-            ObjectMapper objectMapper,
-            Clock clock,
-            WorkerProperties workerProperties) {
-        this.redisTemplate = redisTemplate;
-        this.keyFactory = keyFactory;
-        this.openAiClient = openAiClient;
-        this.objectMapper = objectMapper;
-        this.clock = clock;
-        this.workerProperties = workerProperties;
-    }
+	public QuestionEventProcessor(
+		StringRedisTemplate redisTemplate,
+		RedisKeyFactory keyFactory,
+		OpenAiClient openAiClient,
+		ObjectMapper objectMapper,
+		Clock clock,
+		WorkerProperties workerProperties) {
+		this.redisTemplate = redisTemplate;
+		this.keyFactory = keyFactory;
+		this.openAiClient = openAiClient;
+		this.objectMapper = objectMapper;
+		this.clock = clock;
+		this.workerProperties = workerProperties;
+	}
 
-    public void process(QuestionEvent event, String streamMessageId) {
-        Instant startedAt = Instant.now(clock);
-        // XPENDING chat_rooms:{room_id}:question_events llm-workers
-        // llm-workers Consumer Group에 ACK 되지 않은 pending 메시지 조회 가능
-        // XPENDING 커맨드 결과로 다음 순서대로 출력 됨.
-        //   - 전체 pending 메시지 수
-        //   - 가장 오래된 pending 메시지 ID
-        //   - 가장 최근 pending 메시지 ID
-        //   - 메시지를 전달받은 cosnumer 이름
-        //   - worker의 PEL에 저장된 메시지 수
-        log.info("event=REDIS_EVENT_CONSUMED redis_command=XREADGROUP stream_key={} room_id={} message_id={} role={} stream_message_id={} consumer_group={}",
-                keyFactory.questionEventsKey(event.roomId()), event.roomId(), event.messageId(), event.role(),
-                streamMessageId, workerProperties.group()
-        );
-        try {
-            log.info("event=LLM_REQUEST_STARTED room_id={} message_id={} stream_message_id={} model=gpt-5.6-luna reasoning=low",
-                    event.roomId(), event.messageId(), streamMessageId
-            );
-            String answer = openAiClient.generate(event.content());
-            log.info("event=LLM_RESPONSE_RECEIVED room_id={} message_id={} stream_message_id={} elapsed_ms={}",
-                    event.roomId(), event.messageId(), streamMessageId,
-                    java.time.Duration.between(startedAt, Instant.now(clock)).toMillis()
-            );
+	public void process(QuestionEvent event, String streamMessageId) {
+		Instant startedAt = Instant.now(clock);
+		// XPENDING chat_rooms:{room_id}:question_events llm-workers
+		// llm-workers Consumer Group에 ACK 되지 않은 pending 메시지 조회 가능
+		// XPENDING 커맨드 결과로 다음 순서대로 출력 됨.
+		//   - 전체 pending 메시지 수
+		//   - 가장 오래된 pending 메시지 ID
+		//   - 가장 최근 pending 메시지 ID
+		//   - 메시지를 전달받은 cosnumer 이름
+		//   - worker의 PEL에 저장된 메시지 수
+		log.info(
+			"event=REDIS_EVENT_CONSUMED redis_command=XREADGROUP stream_key={} room_id={} message_id={} role={} stream_message_id={} consumer_group={}",
+			keyFactory.questionEventsKey(event.roomId()), event.roomId(), event.messageId(), event.role(),
+			streamMessageId, workerProperties.group());
+		try {
+			log.info(
+				"event=LLM_REQUEST_STARTED room_id={} message_id={} stream_message_id={} model=gpt-5.6-luna reasoning=low",
+				event.roomId(), event.messageId(), streamMessageId);
+			String answer = openAiClient.generate(event.content());
+			log.info("event=LLM_RESPONSE_RECEIVED room_id={} message_id={} stream_message_id={} elapsed_ms={}",
+				event.roomId(), event.messageId(), streamMessageId,
+				java.time.Duration.between(startedAt, Instant.now(clock)).toMillis());
 
-            UUID assistantMessageId = UUID.randomUUID();
-            UUID userMessageId = event.messageId();
-            ChatMessage assistant = ChatMessage.create(
-                    assistantMessageId,
-                    userMessageId,
-                    answer,
-                    "assistant",
-                    streamMessageId,
-                    Instant.now(clock)
-            );
-            String messagesKey = keyFactory.messagesKey(event.roomId());
-            redisTemplate.opsForList().rightPush(messagesKey, objectMapper.writeValueAsString(assistant));
-            log.info("event=REDIS_MESSAGE_SAVED redis_command=RPUSH redis_key={} room_id={} message_id={} role=assistant stream_message_id={} created_at={}",
-                    messagesKey, event.roomId(), assistantMessageId, streamMessageId, assistant.createdAt()
-            );
+			UUID assistantMessageId = UUID.randomUUID();
+			UUID userMessageId = event.messageId();
+			ChatMessage assistant = ChatMessage.create(
+				assistantMessageId,
+				userMessageId,
+				answer,
+				"assistant",
+				streamMessageId,
+				Instant.now(clock));
+			String messagesKey = keyFactory.messagesKey(event.roomId());
+			redisTemplate.opsForList().rightPush(messagesKey, objectMapper.writeValueAsString(assistant));
+			log.info(
+				"event=REDIS_MESSAGE_SAVED redis_command=RPUSH redis_key={} room_id={} message_id={} role=assistant stream_message_id={} created_at={}",
+				messagesKey, event.roomId(), assistantMessageId, streamMessageId, assistant.createdAt());
 
-            String streamKey = keyFactory.questionEventsKey(event.roomId());
-            // XACK 커맨드는 PEL에서만 메시지를 제거하고, Stream의 원본 엔트리에는 그대로 남긴다.
-            redisTemplate.opsForStream().acknowledge(streamKey, workerProperties.group(), streamMessageId);
-            log.info("event=REDIS_EVENT_ACKNOWLEDGED redis_command=XACK stream_key={} room_id={} stream_message_id={} consumer_group={}",
-                    streamKey, event.roomId(), streamMessageId, workerProperties.group()
-            );
-            log.info("event=MESSAGE_PROCESSING_COMPLETED room_id={} user_message_id={} assistant_message_id={} stream_message_id={} elapsed_ms={}",
-                    event.roomId(), event.messageId(), assistantMessageId, streamMessageId,
-                    java.time.Duration.between(startedAt, Instant.now(clock)).toMillis()
-            );
-        } catch (RuntimeException exception) {
-            log.error("event=MESSAGE_PROCESSING_FAILED room_id={} message_id={} stream_message_id={} error_type={} error_message={}",
-                    event.roomId(), event.messageId(), streamMessageId, exception.getClass().getSimpleName(), exception.getMessage()
-            );
-            throw exception;
-        }
-    }
+			String streamKey = keyFactory.questionEventsKey(event.roomId());
+			// XACK 커맨드는 PEL에서만 메시지를 제거하고, Stream의 원본 엔트리에는 그대로 남긴다.
+			redisTemplate.opsForStream().acknowledge(streamKey, workerProperties.group(), streamMessageId);
+			log.info(
+				"event=REDIS_EVENT_ACKNOWLEDGED redis_command=XACK stream_key={} room_id={} stream_message_id={} consumer_group={}",
+				streamKey, event.roomId(), streamMessageId, workerProperties.group());
+			log.info(
+				"event=MESSAGE_PROCESSING_COMPLETED room_id={} user_message_id={} assistant_message_id={} stream_message_id={} elapsed_ms={}",
+				event.roomId(), event.messageId(), assistantMessageId, streamMessageId,
+				java.time.Duration.between(startedAt, Instant.now(clock)).toMillis());
+		} catch (RuntimeException exception) {
+			log.error(
+				"event=MESSAGE_PROCESSING_FAILED room_id={} message_id={} stream_message_id={} error_type={} error_message={}",
+				event.roomId(), event.messageId(), streamMessageId, exception.getClass().getSimpleName(),
+				exception.getMessage());
+			throw exception;
+		}
+	}
 }

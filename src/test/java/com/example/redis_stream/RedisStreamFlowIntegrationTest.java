@@ -33,61 +33,63 @@ import tools.jackson.databind.ObjectMapper;
 
 class RedisStreamFlowIntegrationTest {
 
-    @Test
-    void storesQuestionConsumesItStoresAnswerAndAcknowledgesIt() throws Exception {
-        LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory("localhost", 6379);
-        connectionFactory.afterPropertiesSet();
-        StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
-        redis.afterPropertiesSet();
+	@Test
+	void storesQuestionConsumesItStoresAnswerAndAcknowledgesIt() throws Exception {
+		LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory("localhost", 6379);
+		connectionFactory.afterPropertiesSet();
+		StringRedisTemplate redis = new StringRedisTemplate(connectionFactory);
+		redis.afterPropertiesSet();
 
-        RedisKeyFactory keys = new RedisKeyFactory();
-        Clock clock = Clock.fixed(Instant.parse("2026-10-16T12:00:00Z"), ZoneOffset.UTC);
-        UUID roomId = null;
-        String metadataKey = null;
-        String messagesKey = null;
-        String streamKey = null;
-        String group = "integration-" + UUID.randomUUID();
+		RedisKeyFactory keys = new RedisKeyFactory();
+		Clock clock = Clock.fixed(Instant.parse("2026-10-16T12:00:00Z"), ZoneOffset.UTC);
+		UUID roomId = null;
+		String metadataKey = null;
+		String messagesKey = null;
+		String streamKey = null;
+		String group = "integration-" + UUID.randomUUID();
 
-        try {
-            Assumptions.assumeTrue(Boolean.TRUE.equals(redis.getConnectionFactory().getConnection().ping().equals("PONG")),
-                    "local Redis is unavailable");
-            ChatRoomService rooms = new ChatRoomService(redis, keys, clock);
-            roomId = rooms.createRoom();
-            metadataKey = keys.metadataKey(roomId);
-            messagesKey = keys.messagesKey(roomId);
-            streamKey = keys.questionEventsKey(roomId);
+		try {
+			Assumptions.assumeTrue(
+				Boolean.TRUE.equals(redis.getConnectionFactory().getConnection().ping().equals("PONG")),
+				"local Redis is unavailable");
+			ChatRoomService rooms = new ChatRoomService(redis, keys, clock);
+			roomId = rooms.createRoom();
+			metadataKey = keys.metadataKey(roomId);
+			messagesKey = keys.messagesKey(roomId);
+			streamKey = keys.questionEventsKey(roomId);
 
-            ChatMessageService messages = new ChatMessageService(redis, keys, rooms, new ObjectMapper(), clock);
-            SendMessageResponse sent = messages.send(roomId, "question");
-            ConsumerGroupManager groups = new ConsumerGroupManager(redis, new WorkerProperties(group, Duration.ofSeconds(1), "integration-worker"));
-            groups.ensureGroup(streamKey);
+			ChatMessageService messages = new ChatMessageService(redis, keys, rooms, new ObjectMapper(), clock);
+			SendMessageResponse sent = messages.send(roomId, "question");
+			ConsumerGroupManager groups = new ConsumerGroupManager(redis,
+				new WorkerProperties(group, Duration.ofSeconds(1), "integration-worker"));
+			groups.ensureGroup(streamKey);
 
-            List<MapRecord<String, Object, Object>> records = redis.opsForStream().read(
-                    Consumer.from(group, "integration-worker"),
-                    StreamReadOptions.empty().count(1),
-                    StreamOffset.create(streamKey, ReadOffset.lastConsumed()));
-            assertThat(records).hasSize(1);
+			List<MapRecord<String, Object, Object>> records = redis.opsForStream().read(
+				Consumer.from(group, "integration-worker"),
+				StreamReadOptions.empty().count(1),
+				StreamOffset.create(streamKey, ReadOffset.lastConsumed()));
+			assertThat(records).hasSize(1);
 
-            OpenAiClient fakeClient = ignored -> "answer";
-            QuestionEventProcessor processor = new QuestionEventProcessor(
-                    redis, keys, fakeClient, new ObjectMapper(), clock,
-                    new WorkerProperties(group, Duration.ofSeconds(1), "integration-worker"));
-            MapRecord<String, Object, Object> record = records.getFirst();
-            processor.process(
-                    new com.example.redis_stream.chat.QuestionEvent(
-                            roomId, sent.messageId(), "question", "user"),
-                    record.getId().getValue());
+			OpenAiClient fakeClient = ignored -> "answer";
+			QuestionEventProcessor processor = new QuestionEventProcessor(
+				redis, keys, fakeClient, new ObjectMapper(), clock,
+				new WorkerProperties(group, Duration.ofSeconds(1), "integration-worker"));
+			MapRecord<String, Object, Object> record = records.getFirst();
+			processor.process(
+				new com.example.redis_stream.chat.QuestionEvent(
+					roomId, sent.messageId(), "question", "user"),
+				record.getId().getValue());
 
-            List<ChatMessage> stored = messages.findAll(roomId);
-            assertThat(stored).extracting(ChatMessage::role).containsExactly("user", "assistant");
-            assertThat(stored.get(1).streamMessageId()).isEqualTo(record.getId().getValue());
-            assertThat(redis.opsForStream().pending(streamKey, group).getTotalPendingMessages()).isZero();
-        } finally {
-            if (roomId != null) {
-                redis.delete(List.of(metadataKey, messagesKey, streamKey));
-                redis.opsForSet().remove(keys.roomIndexKey(), roomId.toString());
-            }
-            connectionFactory.destroy();
-        }
-    }
+			List<ChatMessage> stored = messages.findAll(roomId);
+			assertThat(stored).extracting(ChatMessage::role).containsExactly("user", "assistant");
+			assertThat(stored.get(1).streamMessageId()).isEqualTo(record.getId().getValue());
+			assertThat(redis.opsForStream().pending(streamKey, group).getTotalPendingMessages()).isZero();
+		} finally {
+			if (roomId != null) {
+				redis.delete(List.of(metadataKey, messagesKey, streamKey));
+				redis.opsForSet().remove(keys.roomIndexKey(), roomId.toString());
+			}
+			connectionFactory.destroy();
+		}
+	}
 }
