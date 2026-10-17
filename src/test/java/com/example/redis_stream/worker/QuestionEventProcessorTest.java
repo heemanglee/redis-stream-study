@@ -78,6 +78,7 @@ class QuestionEventProcessorTest {
         verify(listOperations).rightPush(eq("chat_rooms:" + ROOM_ID + ":messages"), assistantJson.capture());
         ChatMessage assistant = new ObjectMapper().readValue(assistantJson.getValue(), ChatMessage.class);
         assertThat(assistant.role()).isEqualTo("assistant");
+        assertThat(assistant.userMessageId()).isEqualTo(USER_MESSAGE_ID);
         assertThat(assistant.content()).isEqualTo("answer");
         assertThat(assistant.streamMessageId()).isEqualTo(STREAM_MESSAGE_ID);
         assertThat(assistant.createdAt()).isEqualTo(CREATED_AT);

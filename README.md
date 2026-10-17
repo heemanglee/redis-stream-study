@@ -68,8 +68,14 @@ The worker discovers room IDs through `chat_rooms:index`, creates the `llm-worke
 
 ```text
 XGROUP CREATE chat_rooms:{room_id}:question_events llm-workers 0-0
-XREADGROUP GROUP llm-workers worker-local COUNT 1 BLOCK 1s STREAMS chat_rooms:{room_id}:question_events >
+XREADGROUP GROUP llm-workers worker-local COUNT 5 BLOCK 1s STREAMS chat_rooms:{room_id}:question_events >
 ```
+
+The worker reads up to five events per poll and submits them to a fixed
+five-thread executor. Redis adds the delivered entries to the consumer
+group's PEL immediately; each processing task stores its assistant message
+and then acknowledges its own event with `XACK`. Processing order is not
+guaranteed in this learning project.
 
 After the OpenAI response, it executes:
 

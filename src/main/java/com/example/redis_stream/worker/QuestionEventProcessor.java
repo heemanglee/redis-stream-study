@@ -68,7 +68,15 @@ public class QuestionEventProcessor {
             );
 
             UUID assistantMessageId = UUID.randomUUID();
-            ChatMessage assistant = ChatMessage.create(assistantMessageId, answer, "assistant", streamMessageId, Instant.now(clock));
+            UUID userMessageId = event.messageId();
+            ChatMessage assistant = ChatMessage.create(
+                    assistantMessageId,
+                    userMessageId,
+                    answer,
+                    "assistant",
+                    streamMessageId,
+                    Instant.now(clock)
+            );
             String messagesKey = keyFactory.messagesKey(event.roomId());
             redisTemplate.opsForList().rightPush(messagesKey, objectMapper.writeValueAsString(assistant));
             log.info("event=REDIS_MESSAGE_SAVED redis_command=RPUSH redis_key={} room_id={} message_id={} role=assistant stream_message_id={} created_at={}",
