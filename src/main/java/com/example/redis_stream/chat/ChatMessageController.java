@@ -1,15 +1,12 @@
 package com.example.redis_stream.chat;
 
+import com.example.redis_stream.worker.QuestionEventStatusResponse;
+import com.example.redis_stream.worker.QuestionEventStatusService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.UUID;
-
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/chat-rooms")
@@ -17,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
+    private final QuestionEventStatusService questionEventStatusService;
 
     @PostMapping("/{roomId}/messages")
     public SendMessageResponse send(
@@ -26,8 +24,16 @@ public class ChatMessageController {
         return chatMessageService.send(roomId, request.content());
     }
 
-    @GetMapping
+    @GetMapping("/{roomId}/messages")
     public List<ChatMessage> findAll(@PathVariable UUID roomId) {
         return chatMessageService.findAll(roomId);
+    }
+
+    @GetMapping("/{roomId}/question-events/{streamMessageId}/status")
+    public QuestionEventStatusResponse status(
+            @PathVariable UUID roomId,
+            @PathVariable String streamMessageId
+    ) {
+        return questionEventStatusService.getStatus(roomId, streamMessageId);
     }
 }

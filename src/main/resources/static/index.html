@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis Stream Concurrent Message Lab</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<main class="shell">
+    <header class="hero">
+        <div>
+            <p class="eyebrow">REDIS STREAM LAB</p>
+            <h1>Concurrent message sender</h1>
+            <p class="subtitle">1~5개의 질문을 동시에 발행하고, 각 요청의 Stream 결과를 확인하세요.</p>
+        </div>
+        <div class="badge">XREADGROUP playground</div>
+    </header>
+    <section class="panel setup-panel">
+        <div class="section-heading">
+            <div><p class="section-kicker">01 / ROOM</p><h2>채팅방 준비</h2></div>
+            <button id="create-room-button" class="button button-secondary" type="button">새 채팅방 생성</button>
+        </div>
+        <label class="field-label" for="room-id">Room ID</label>
+        <input id="room-id" class="text-input mono" type="text" placeholder="UUID를 입력하거나 새 채팅방을 생성하세요">
+        <p id="room-status" class="hint">메시지를 보내기 전에 Room ID를 준비하세요.</p>
+    </section>
+    <section class="panel composer-panel">
+        <div class="section-heading">
+            <div><p class="section-kicker">02 / PUBLISH</p><h2>동시 발행할 메시지</h2></div>
+            <label class="count-control" for="message-count"><span>메시지 수</span>
+                <select id="message-count" class="select-input">
+                    <option value="1">1개</option><option value="2">2개</option><option value="3">3개</option>
+                    <option value="4">4개</option><option value="5">5개</option>
+                </select>
+            </label>
+        </div>
+        <div id="message-inputs" class="message-inputs"></div>
+        <div class="action-row">
+            <span id="send-status" class="hint">요청은 Promise.all로 동시에 전송됩니다.</span>
+            <button id="send-button" class="button button-primary" type="button">동시 전송</button>
+        </div>
+    </section>
+    <section class="panel debug-panel">
+        <div class="section-heading">
+            <div><p class="section-kicker">03 / DEBUG</p><h2>요청 결과</h2></div>
+            <button id="clear-results-button" class="button button-ghost" type="button">기록 지우기</button>
+        </div>
+        <div id="debug-summary" class="debug-summary empty">아직 전송한 요청이 없습니다.</div>
+        <div id="debug-list" class="debug-list" aria-live="polite"></div>
+    </section>
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

@@ -94,6 +94,17 @@ redis-cli --raw LRANGE "chat_rooms:${ROOM_ID}:messages" 0 -1
 redis-cli XPENDING "chat_rooms:${ROOM_ID}:question_events" llm-workers
 ```
 
+### 5. Use the concurrent message web UI
+
+Run the application and open [http://localhost:8080/](http://localhost:8080/).
+The page lets you choose one to five messages, enter each message content, and
+send them concurrently. It displays the HTTP status, elapsed time,
+the question, `message_id`, and Redis `stream_message_id` for each request.
+Click a successful result to poll
+`GET /api/v1/chat-rooms/{roomId}/question-events/{streamMessageId}/status` and
+watch `PUBLISHED → PENDING → ASSISTANT_SAVED → ACKED` until the worker finishes.
+
+
 ## Important log events
 
 The worker and API use SLF4J INFO logs. Search for these event names:
