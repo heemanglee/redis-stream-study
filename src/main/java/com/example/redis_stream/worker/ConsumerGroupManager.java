@@ -29,9 +29,9 @@ public class ConsumerGroupManager {
             );
         } catch (RedisSystemException exception) {
             if (isBusyGroup(exception)) {
-                log.info("event=REDIS_CONSUMER_GROUP_EXISTS redis_command=XGROUP stream_key={} consumer_group={}",
-                        streamKey, workerProperties.group()
-                );
+//                log.info("event=REDIS_CONSUMER_GROUP_EXISTS redis_command=XGROUP stream_key={} consumer_group={}",
+//                        streamKey, workerProperties.group()
+//                );
                 return;
             }
             throw exception;

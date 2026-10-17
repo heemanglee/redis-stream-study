@@ -45,6 +45,14 @@ public class QuestionEventProcessor {
 
     public void process(QuestionEvent event, String streamMessageId) {
         Instant startedAt = Instant.now(clock);
+        // XPENDING chat_rooms:{room_id}:question_events llm-workers
+        // llm-workers Consumer Group에 ACK 되지 않은 pending 메시지 조회 가능
+        // XPENDING 커맨드 결과로 다음 순서대로 출력 됨.
+        //   - 전체 pending 메시지 수
+        //   - 가장 오래된 pending 메시지 ID
+        //   - 가장 최근 pending 메시지 ID
+        //   - 메시지를 전달받은 cosnumer 이름
+        //   - worker의 PEL에 저장된 메시지 수
         log.info("event=REDIS_EVENT_CONSUMED redis_command=XREADGROUP stream_key={} room_id={} message_id={} role={} stream_message_id={} consumer_group={}",
                 keyFactory.questionEventsKey(event.roomId()), event.roomId(), event.messageId(), event.role(),
                 streamMessageId, workerProperties.group()
@@ -68,6 +76,7 @@ public class QuestionEventProcessor {
             );
 
             String streamKey = keyFactory.questionEventsKey(event.roomId());
+            // XACK 커맨드는 PEL에서만 메시지를 제거하고, Stream의 원본 엔트리에는 그대로 남긴다.
             redisTemplate.opsForStream().acknowledge(streamKey, workerProperties.group(), streamMessageId);
             log.info("event=REDIS_EVENT_ACKNOWLEDGED redis_command=XACK stream_key={} room_id={} stream_message_id={} consumer_group={}",
                     streamKey, event.roomId(), streamMessageId, workerProperties.group()
